@@ -1,8 +1,6 @@
-Here’s your improved and **more engaging** `README.md`, now styled with markdown enhancements, emojis, callouts, and cleaner formatting to make it pop for potential employers, contributors, or users:
 
----
 
-```markdown
+
 # 📈 IPO Web Application
 
 Welcome to the **IPO Web Application** — a modern full-stack platform to **track**, **manage**, and **register** IPOs in real-time.  
