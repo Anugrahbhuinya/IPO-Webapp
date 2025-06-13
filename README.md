@@ -4,7 +4,7 @@
 # 📈 IPO Web Application
 
 Welcome to the **IPO Web Application** — a modern full-stack platform to **track**, **manage**, and **register** IPOs in real-time.  
-Built using **React.js**, **Flask**, and **MongoDB**, this platform empowers **investors** and **admins** with clean UI/UX, powerful data tools, and secure authentication.
+Built using **React.js**and **MongoDB**, this platform empowers **investors** and **admins** with clean UI/UX, powerful data tools, and secure authentication.
 
 ---
 
