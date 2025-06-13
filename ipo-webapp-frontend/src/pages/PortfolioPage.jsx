@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { RiLoader4Line, RiErrorWarningLine, RiWallet3Line, RiStockLine, RiDeleteBinLine } from '@remixicon/react';
+import ConfirmationDialog from '../components/common/ConfirmationDialog';
 
 const PortfolioPage = () => {
   const [portfolio, setPortfolio] = useState(null);
@@ -10,6 +11,16 @@ const PortfolioPage = () => {
   const [sellError, setSellError] = useState(null);
   const [sellLoading, setSellLoading] = useState(null); // Track which holding is being sold
   const { user } = useAuth(); // Get user info if needed
+  
+  // State for confirmation dialog
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    holdingId: null,
+    sharesToSell: 0,
+    symbol: ''
+  });
 
   const fetchPortfolio = useCallback(async () => {
     try {
@@ -34,7 +45,7 @@ const PortfolioPage = () => {
     fetchPortfolio();
   }, [fetchPortfolio]);
 
-  const handleSell = async (holdingId, sharesToSell, symbol) => {
+  const openSellConfirmation = (holdingId, sharesToSell, symbol) => {
     // Basic validation - ensure sharesToSell is a positive number
     const numShares = parseInt(sharesToSell, 10);
     if (isNaN(numShares) || numShares <= 0) {
@@ -42,24 +53,39 @@ const PortfolioPage = () => {
       return;
     }
 
-    if (window.confirm(`Are you sure you want to sell ${numShares} share(s) of ${symbol}?`)) {
-      setSellLoading(holdingId);
-      setSellError(null);
-      try {
-        const response = await apiClient.post(`/portfolio/sell/${holdingId}`, { shares: numShares });
-        if (response.data && response.data.success) {
-          // Refresh portfolio data after successful sale
-          fetchPortfolio(); 
-          // Optionally show a success message
-        } else {
-          setSellError(response.data?.error || `Failed to sell ${symbol}.`);
-        }
-      } catch (err) {
-        console.error("Error selling holding:", err);
-        setSellError(err.response?.data?.error || `An error occurred while selling ${symbol}.`);
-      } finally {
-        setSellLoading(null);
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirm Sale',
+      message: `Are you sure you want to sell ${numShares} share(s) of ${symbol}?`,
+      holdingId,
+      sharesToSell: numShares,
+      symbol
+    });
+  };
+
+  const handleSell = async () => {
+    const { holdingId, sharesToSell, symbol } = confirmDialog;
+    
+    setSellLoading(holdingId);
+    setSellError(null);
+    try {
+      const response = await apiClient.post(`/portfolio/sell/${holdingId}`, { shares: sharesToSell });
+      if (response.data && response.data.success) {
+        // Refresh portfolio data after successful sale
+        fetchPortfolio(); 
+        // Close the dialog
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+        // Optionally show a success message
+      } else {
+        setSellError(response.data?.error || `Failed to sell ${symbol}.`);
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
       }
+    } catch (err) {
+      console.error("Error selling holding:", err);
+      setSellError(err.response?.data?.error || `An error occurred while selling ${symbol}.`);
+      setConfirmDialog({ ...confirmDialog, isOpen: false });
+    } finally {
+      setSellLoading(null);
     }
   };
 
@@ -135,7 +161,7 @@ const PortfolioPage = () => {
                               aria-label={`Shares to sell for ${holding.ipoSymbol}`}
                             />
                             <button 
-                              onClick={() => handleSell(holding._id, document.getElementById(`sell-shares-${holding._id}`).value, holding.ipoSymbol)}
+                              onClick={() => openSellConfirmation(holding._id, document.getElementById(`sell-shares-${holding._id}`).value, holding.ipoSymbol)}
                               disabled={sellLoading === holding._id}
                               className="px-2 py-1 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                             >
@@ -155,6 +181,18 @@ const PortfolioPage = () => {
           </div>
         </div>
       )}
+      
+      {/* Custom Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={handleSell}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Sell"
+        cancelText="Cancel"
+        type="warning"
+      />
     </div>
   );
 };

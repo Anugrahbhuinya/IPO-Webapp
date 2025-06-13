@@ -1,23 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { RiLoader4Line, RiPencilLine, RiDeleteBinLine, RiErrorWarningLine } from '@remixicon/react'; // Import icons
-
-// Placeholder for Edit Modal - to be implemented later
-// const EditIPOModal = ({ ipo, onClose, onSave }) => { ... };
+import { RiLoader4Line, RiPencilLine, RiDeleteBinLine, RiErrorWarningLine } from '@remixicon/react';
+import ConfirmationDialog from '../common/ConfirmationDialog';
 
 const AdminIPOList = () => {
   const [ipos, setIpos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { authToken } = useAuth(); // Get token for authenticated requests
-  // const [editingIPO, setEditingIPO] = useState(null); // State for edit modal
+  const { authToken } = useAuth();
+  
+  // State for confirmation dialog
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    ipoId: null,
+    ipoName: '',
+    type: 'danger'
+  });
 
   const fetchIPOs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiClient.get('/ipos'); // Fetch all IPOs
+      const response = await apiClient.get('/ipos');
       if (response.data && response.data.success) {
         setIpos(response.data.data);
       } else {
@@ -33,56 +40,54 @@ const AdminIPOList = () => {
 
   useEffect(() => {
     fetchIPOs();
-    // Add Socket.IO listener if needed to refresh list on updates from other admins
-    // socket.on('ipoUpdate', fetchIPOs);
-    // return () => socket.off('ipoUpdate', fetchIPOs);
   }, [fetchIPOs]);
 
-  const handleDelete = async (ipoId, ipoName) => {
-    if (window.confirm(`Are you sure you want to delete the IPO: ${ipoName}?`)) {
-      try {
-        setError(null);
-        // Ensure API client has the auth token set
-        const response = await apiClient.delete(`/ipos/${ipoId}`);
-        if (response.data && response.data.success) {
-          // Refresh the list after successful deletion
-          fetchIPOs(); 
-          // Optionally show a success message
-        } else {
-          setError(response.data?.error || 'Failed to delete IPO.');
-        }
-      } catch (err) {
-        console.error("Error deleting IPO:", err);
-        setError(err.response?.data?.error || 'An error occurred while deleting the IPO.');
-      }
-    }
+  const openDeleteConfirmation = (ipoId, ipoName) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Confirm Deletion',
+      message: `Are you sure you want to delete the IPO: ${ipoName}?`,
+      ipoId,
+      ipoName,
+      type: 'danger'
+    });
   };
 
-  // const handleEdit = (ipo) => {
-  //   setEditingIPO(ipo);
-  // };
-
-  // const handleSaveEdit = async (updatedData) => {
-  //   // Call PUT /api/ipos/:id endpoint
-  //   // ... handle response ...
-  //   setEditingIPO(null);
-  //   fetchIPOs();
-  // };
+  const handleDelete = async () => {
+    try {
+      setError(null);
+      const response = await apiClient.delete(`/ipos/${confirmDialog.ipoId}`);
+      if (response.data && response.data.success) {
+        fetchIPOs(); 
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+      } else {
+        setError(response.data?.error || 'Failed to delete IPO.');
+        setConfirmDialog({ ...confirmDialog, isOpen: false });
+      }
+    } catch (err) {
+      console.error("Error deleting IPO:", err);
+      setError(err.response?.data?.error || 'An error occurred while deleting the IPO.');
+      setConfirmDialog({ ...confirmDialog, isOpen: false });
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-md mt-8">
       <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">Manage IPOs</h2>
+      
       {loading && (
         <div className="flex justify-center items-center py-4">
           <RiLoader4Line size={24} className="animate-spin text-blue-500" />
           <span className="ml-2 text-gray-600 dark:text-gray-400">Loading IPOs...</span>
         </div>
       )}
+      
       {error && (
         <div className="text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-900/30 p-3 rounded-md text-sm mb-4 flex items-center">
           <RiErrorWarningLine className="inline mr-2" size={18}/> Error: {error}
         </div>
       )}
+      
       {!loading && !error && (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -109,15 +114,14 @@ const AdminIPOList = () => {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium space-x-2">
                       <button 
-                        // onClick={() => handleEdit(ipo)}
                         title="Edit IPO" 
                         className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200 disabled:opacity-50"
-                        disabled // Enable when edit functionality is added
+                        disabled
                       >
                         <RiPencilLine size={18} />
                       </button>
                       <button 
-                        onClick={() => handleDelete(ipo._id, ipo.companyName)}
+                        onClick={() => openDeleteConfirmation(ipo._id, ipo.companyName)}
                         title="Delete IPO"
                         className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200"
                       >
@@ -137,7 +141,18 @@ const AdminIPOList = () => {
           </table>
         </div>
       )}
-      {/* {editingIPO && <EditIPOModal ipo={editingIPO} onClose={() => setEditingIPO(null)} onSave={handleSaveEdit} />} */}
+      
+      {/* Custom Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+        onConfirm={handleDelete}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type={confirmDialog.type}
+      />
     </div>
   );
 };
